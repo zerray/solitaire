@@ -294,15 +294,15 @@
         // --- Layout Engine (Perfect Centering & Exact Height) ---
         function calculateLayout() {
             const board = document.getElementById('board');
-            let availableW = window.innerWidth * 0.92; 
-            if (availableW > 800) availableW = 800; 
+            const GAP_RATIO = 0.10; // gap as a fraction of card width
+            let boardW = window.innerWidth * 0.92; 
+            if (boardW > 686.8) boardW = 686.8; // same max board width as before (85px cards, 0.18 gaps)
             
-            let w = availableW / 8.08; 
-            if (w > 85) w = 85; 
+            let w = boardW / (7 + 6 * GAP_RATIO); 
             
             CARD_W = w;
             CARD_H = w * 1.45; 
-            GAP = w * 0.18; 
+            GAP = w * GAP_RATIO; 
 
             let boardWidth = (7 * CARD_W) + (6 * GAP);
             board.style.width = boardWidth + 'px';
