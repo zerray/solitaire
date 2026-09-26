@@ -67,13 +67,14 @@
             letter-spacing: 2px;
         }
         .stats {
+            position: relative;
             display: flex; justify-content: center; align-items: center; gap: 20px;
             font-size: 15px; font-weight: bold; 
             text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
         .stats span { opacity: 0.9; }
 
-        .refresh-btn {
+        .refresh-btn, .undo-btn {
             background: none; border: none; color: inherit;
             font-size: 26px; font-weight: bold; cursor: pointer;
             padding: 0; margin: 0; line-height: 1;
@@ -81,6 +82,8 @@
             transition: transform 0.3s; display: flex; align-items: center;
         }
         .refresh-btn:hover { transform: rotate(180deg); }
+        .undo-btn { position: absolute; top: 0; bottom: 0; right: 0; }
+        .undo-btn:hover { transform: rotate(-30deg); }
 
         /* --- Game Board --- */
         #board {
@@ -227,9 +230,10 @@
     <div class="header">
         <h1>SOLITAIRE</h1>
         <div class="stats">
-            <button class="refresh-btn" onclick="initGame()" title="New Game">↻</button>
+            <button class="refresh-btn" onclick="initGame()" title="New Game">✚</button>
             <span>TIME: <b id="timer">00:00</b></span>
             <span>BEST: <b id="best-time">--:--</b></span>
+            <button class="undo-btn" onclick="undo()" title="Undo">↻</button>
         </div>
     </div>
 
@@ -290,6 +294,7 @@
         let pointerStartX = 0, pointerStartY = 0;
         let isDragging = false;
         let autoCompleteTimer = null;
+        let history = [];
 
         // --- Layout Engine (Perfect Centering & Exact Height) ---
         function calculateLayout() {
@@ -385,6 +390,7 @@
         function initGame() {
             stopTimer(); elapsedSeconds = 0; isGameStarted = false; updateTimerUI();
             clearTimeout(autoCompleteTimer); autoCompleteTimer = null;
+            history = [];
             selectedCard = null; draggedCards = []; document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
             deck.forEach(c => { c.isFaceUp = false; c.el.classList.remove('face-up'); });
 
@@ -476,7 +482,7 @@
         }
 
         function moveCards(cards, sourceArr, targetArr) {
-            startTimer();
+            startTimer(); pushHistory();
             const idx = sourceArr.indexOf(cards[0]);
             sourceArr.splice(idx, cards.length);
             targetArr.push(...cards);
@@ -515,7 +521,7 @@
         }
 
         function handleStockClick() {
-            startTimer(); clearSelection();
+            startTimer(); clearSelection(); pushHistory();
             if (piles.stock.length > 0) piles.waste.push(piles.stock.pop());
             else while (piles.waste.length > 0) piles.stock.push(piles.waste.pop());
             calculateLayout();
@@ -645,6 +651,28 @@
                     updateBestTimeUI();
                 }
             }
+        }
+
+        // --- Undo ---
+        function pushHistory() {
+            history.push({
+                piles: {
+                    stock: [...piles.stock], waste: [...piles.waste],
+                    foundations: piles.foundations.map(p => [...p]),
+                    tableau: piles.tableau.map(p => [...p])
+                },
+                faceUp: deck.map(c => c.isFaceUp)
+            });
+        }
+
+        function undo() {
+            if (autoCompleteTimer || !history.length) return;
+            const snap = history.pop();
+            piles = snap.piles;
+            deck.forEach((c, i) => { c.isFaceUp = snap.faceUp[i]; });
+            clearSelection();
+            calculateLayout();
+            renderAll();
         }
 
         // --- Auto Complete ---
