@@ -511,10 +511,14 @@
                     if (isValidTarget(draggables, tId)) { moveCards(draggables, getPileArray(sourcePileId), getPileArray(tId)); return true; }
                 }
             }
-            if (sourcePileId === 'waste' || (sourcePileId.startsWith('tableau-') && getPileArray(sourcePileId)[0] !== draggables[0])) {
+            if (sourcePileId === 'waste' || sourcePileId.startsWith('tableau-')) {
+                // Moving a whole column into an empty column is pointless, so skip empty targets in that case.
+                const wholeColumn = sourcePileId.startsWith('tableau-') && getPileArray(sourcePileId)[0] === draggables[0];
                 for (let i=0; i<7; i++) {
                     const tId = `tableau-${i}`;
-                    if (tId !== sourcePileId && isValidTarget(draggables, tId)) { moveCards(draggables, getPileArray(sourcePileId), getPileArray(tId)); return true; }
+                    if (tId === sourcePileId) continue;
+                    if (wholeColumn && getPileArray(tId).length === 0) continue;
+                    if (isValidTarget(draggables, tId)) { moveCards(draggables, getPileArray(sourcePileId), getPileArray(tId)); return true; }
                 }
             }
             return false;
