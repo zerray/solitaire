@@ -47,6 +47,8 @@
         }
 
         /* --- Global Layout --- */
+        html { height: 100%; overflow-x: hidden; }
+
         body {
             background-color: var(--bg-color);
             background-image: radial-gradient(circle at center, var(--bg-color), var(--bg-grad));
@@ -228,6 +230,37 @@
             text-align: center; color: #777; font-size: 12px; line-height: 1.5;
         }
         .drawer-footer p { margin: 0 0 4px 0; }
+
+        /* A landscape phone has enough width for the seven columns but much less
+           vertical space. Compact the chrome and let calculateLayout() size the
+           cards against the remaining viewport height. */
+        @media (orientation: landscape) and (max-height: 600px) {
+            html, body {
+                height: 100%;
+                min-height: 0;
+                overflow: hidden;
+            }
+
+            @supports (height: 100dvh) {
+                html, body { height: 100dvh; }
+            }
+
+            body {
+                padding: max(6px, env(safe-area-inset-top))
+                         max(8px, env(safe-area-inset-right))
+                         max(6px, env(safe-area-inset-bottom))
+                         max(8px, env(safe-area-inset-left));
+            }
+
+            .header { margin-bottom: 4px; }
+            .header h1 {
+                margin-bottom: 1px;
+                font-size: clamp(18px, 5vh, 24px);
+                letter-spacing: 1px;
+            }
+            .stats { gap: 12px; font-size: 12px; }
+            .refresh-btn, .undo-btn { font-size: 20px; }
+        }
     </style>
 </head>
 <body>
@@ -302,28 +335,72 @@
         let history = [];
 
         // --- Layout Engine (Perfect Centering & Exact Height) ---
+        function getBoardWidthForViewport(viewportWidth, viewportHeight, boardTop, bottomInset) {
+            const GAP_RATIO = 0.10;
+            const CARD_ASPECT_RATIO = 1.45;
+            const MAX_TABLEAU_CARDS = 13;
+            const FACE_UP_OFFSET = 0.25;
+            const CENTER_GAP_RATIO = 0.5;
+            const LANDSCAPE_BOARD_WIDTH_UNITS = 11 + CENTER_GAP_RATIO + 9 * GAP_RATIO;
+            const isCompactLandscape = viewportWidth > viewportHeight && viewportHeight <= 600;
+            const maxBoardWidth = isCompactLandscape
+                ? viewportWidth * 0.92
+                : Math.min(viewportWidth * 0.92, 686.8);
+
+            if (!isCompactLandscape) return maxBoardWidth;
+
+            const availableHeight = Math.max(1, viewportHeight - boardTop - bottomInset);
+            const boardHeightPerCardWidth = CARD_ASPECT_RATIO * (1 + MAX_TABLEAU_CARDS * FACE_UP_OFFSET);
+            const maxCardWidth = availableHeight / boardHeightPerCardWidth;
+            const maxHeightBoardWidth = maxCardWidth * LANDSCAPE_BOARD_WIDTH_UNITS;
+
+            return Math.min(maxBoardWidth, Math.max(1, maxHeightBoardWidth));
+        }
+
         function calculateLayout() {
             const board = document.getElementById('board');
             const GAP_RATIO = 0.10; // gap as a fraction of card width
-            let boardW = window.innerWidth * 0.92; 
-            if (boardW > 686.8) boardW = 686.8; // same max board width as before (85px cards, 0.18 gaps)
+            const CENTER_GAP_RATIO = 0.5; // separation between tableau and reserve area
+            const isCompactLandscape = window.innerWidth > window.innerHeight && window.innerHeight <= 600;
+            const boardWidthUnits = isCompactLandscape
+                ? 11 + CENTER_GAP_RATIO + 9 * GAP_RATIO
+                : 7 + 6 * GAP_RATIO;
+            const boardTop = board.getBoundingClientRect().top;
+            const bottomInset = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+            const boardW = getBoardWidthForViewport(
+                window.innerWidth,
+                window.innerHeight,
+                boardTop,
+                bottomInset
+            );
             
-            let w = boardW / (7 + 6 * GAP_RATIO); 
+            let w = boardW / boardWidthUnits; 
             
             CARD_W = w;
             CARD_H = w * 1.45; 
             GAP = w * GAP_RATIO; 
 
-            let boardWidth = (7 * CARD_W) + (6 * GAP);
+            let boardWidth = boardWidthUnits * CARD_W;
             board.style.width = boardWidth + 'px';
 
             document.documentElement.style.setProperty('--card-w', `${CARD_W}px`);
             document.documentElement.style.setProperty('--card-h', `${CARD_H}px`);
 
-            POS.stock = { x: 0, y: 0 };
-            POS.waste = { x: CARD_W + GAP, y: 0 };
-            POS.founds = Array.from({length: 4}, (_, i) => ({ x: (i+3)*(CARD_W+GAP), y: 0 }));
-            POS.tabs = Array.from({length: 7}, (_, i) => ({ x: i*(CARD_W+GAP), y: CARD_H + GAP + 10 }));
+            const reserveX = 7 * CARD_W + 6 * GAP + CARD_W * (isCompactLandscape ? CENTER_GAP_RATIO : GAP_RATIO);
+            POS.stock = isCompactLandscape
+                ? { x: reserveX, y: 0 }
+                : { x: 0, y: 0 };
+            POS.waste = isCompactLandscape
+                ? { x: reserveX + CARD_W + GAP, y: 0 }
+                : { x: CARD_W + GAP, y: 0 };
+            POS.founds = Array.from({length: 4}, (_, i) => isCompactLandscape
+                ? { x: reserveX + i * (CARD_W + GAP), y: CARD_H + GAP }
+                : { x: (i+3)*(CARD_W+GAP), y: 0 }
+            );
+            POS.tabs = Array.from({length: 7}, (_, i) => ({
+                x: i * (CARD_W + GAP),
+                y: isCompactLandscape ? 0 : CARD_H + GAP + 10
+            }));
 
             // Live Update Placeholder Positions on Screen Resize
             const updatePh = (id, x, y) => {
@@ -335,7 +412,13 @@
             POS.founds.forEach((p, i) => updatePh(`ph-found-${i}`, p.x, p.y));
             POS.tabs.forEach((p, i) => updatePh(`ph-tab-${i}`, p.x, p.y));
 
-            // Dynamic Board Height (Eliminates Desktop Scrolling)
+            // Landscape reserves space for a fixed 13-card face-up tableau column.
+            if (isCompactLandscape) {
+                board.style.height = `${CARD_H * (1 + 13 * 0.25)}px`;
+                return;
+            }
+
+            // Portrait keeps the compact dynamic height used by the original layout.
             let maxTabHeight = POS.tabs[0].y;
             piles.tableau.forEach((pile, i) => {
                 let h = POS.tabs[i].y;
