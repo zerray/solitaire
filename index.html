@@ -335,17 +335,18 @@
         let history = [];
 
         // --- Layout Engine (Perfect Centering & Exact Height) ---
-        function getBoardWidthForViewport(viewportWidth, viewportHeight, boardTop, bottomInset) {
+        function getBoardWidthForViewport(viewportWidth, viewportHeight, boardTop, bottomInset, horizontalInset = 0) {
             const GAP_RATIO = 0.10;
             const CARD_ASPECT_RATIO = 1.45;
             const MAX_TABLEAU_CARDS = 13;
-            const FACE_UP_OFFSET = 0.25;
+            const FACE_UP_OFFSET = 0.18;
             const CENTER_GAP_RATIO = 0.5;
             const LANDSCAPE_BOARD_WIDTH_UNITS = 11 + CENTER_GAP_RATIO + 9 * GAP_RATIO;
             const isCompactLandscape = viewportWidth > viewportHeight && viewportHeight <= 600;
+            const availableWidth = Math.max(1, viewportWidth - horizontalInset);
             const maxBoardWidth = isCompactLandscape
-                ? viewportWidth * 0.92
-                : Math.min(viewportWidth * 0.92, 686.8);
+                ? Math.min(viewportWidth * 0.96, availableWidth)
+                : Math.min(viewportWidth * 0.94, 686.8, availableWidth);
 
             if (!isCompactLandscape) return maxBoardWidth;
 
@@ -366,12 +367,16 @@
                 ? 11 + CENTER_GAP_RATIO + 9 * GAP_RATIO
                 : 7 + 6 * GAP_RATIO;
             const boardTop = board.getBoundingClientRect().top;
-            const bottomInset = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+            const bodyStyles = getComputedStyle(document.body);
+            const bottomInset = parseFloat(bodyStyles.paddingBottom) || 0;
+            const horizontalInset = (parseFloat(bodyStyles.paddingLeft) || 0)
+                + (parseFloat(bodyStyles.paddingRight) || 0);
             const boardW = getBoardWidthForViewport(
                 window.innerWidth,
                 window.innerHeight,
                 boardTop,
-                bottomInset
+                bottomInset,
+                horizontalInset
             );
             
             let w = boardW / boardWidthUnits; 
@@ -414,7 +419,7 @@
 
             // Landscape reserves space for a fixed 13-card face-up tableau column.
             if (isCompactLandscape) {
-                board.style.height = `${CARD_H * (1 + 13 * 0.25)}px`;
+                board.style.height = `${CARD_H * (1 + 13 * 0.18)}px`;
                 return;
             }
 
@@ -509,11 +514,14 @@
             piles.foundations.forEach((pile, fIdx) => {
                 pile.forEach((card, idx) => updateCard(card, POS.founds[fIdx].x, POS.founds[fIdx].y, zBase + idx, true));
             });
+            const isCompactLandscape = window.innerWidth > window.innerHeight && window.innerHeight <= 600;
             piles.tableau.forEach((pile, tIdx) => {
                 let yOffset = POS.tabs[tIdx].y;
                 pile.forEach((card, idx) => {
                     updateCard(card, POS.tabs[tIdx].x, yOffset, zBase + idx, card.isFaceUp);
-                    yOffset += card.isFaceUp ? (CARD_H * 0.25) : (CARD_H * 0.16);
+                    yOffset += isCompactLandscape
+                        ? CARD_H * 0.18
+                        : card.isFaceUp ? CARD_H * 0.25 : CARD_H * 0.16;
                 });
             });
         }

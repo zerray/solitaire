@@ -35,10 +35,13 @@ console.log(JSON.stringify(context.getBoardWidthForViewport(
 
     def test_landscape_width_fits_a_fixed_13_card_tableau(self):
         board_width = self.run_layout(844, 390, 58, 6)
-        self.assertLess(board_width, 686.8)
+        self.assertLessEqual(board_width, 844 * 0.96)
 
-        board_height_per_card_width = (1 + 13 * 0.25) * 1.45
-        expected_board_width = (390 - 58 - 6) / board_height_per_card_width * 12.4
+        board_height_per_card_width = (1 + 13 * 0.18) * 1.45
+        expected_board_width = min(
+            844 * 0.96,
+            (390 - 58 - 6) / board_height_per_card_width * 12.4,
+        )
         self.assertAlmostEqual(board_width, expected_board_width)
 
         card_width = board_width / 12.4
@@ -47,7 +50,7 @@ console.log(JSON.stringify(context.getBoardWidthForViewport(
 
     def test_portrait_layout_keeps_the_existing_width_limit(self):
         board_width = self.run_layout(390, 844, 100, 60)
-        self.assertAlmostEqual(board_width, 390 * 0.92)
+        self.assertAlmostEqual(board_width, 390 * 0.94)
 
 
 if __name__ == "__main__":
